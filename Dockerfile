@@ -19,16 +19,19 @@ RUN apt-get update \
         libavformat-dev \
         libpq-dev \
         libv4l-dev \
+        libhdf5-dev \
         libgstreamer-plugins-base1.0-dev
 
 RUN pip install numpy
 
+# Intel MKL
 WORKDIR /usr/src
 RUN wget https://github.com/intel/mkl-dnn/archive/v0.19.tar.gz \
-&& tar xzvf v0.19.tar.gz && cd mkl-dnn-0.19/scripts \
+&& tar xzvf v0.19.tar.gz
+RUN cd mkl-dnn-0.19/scripts \
 && ./prepare_mkl.sh && cd .. \
 && mkdir -p build && cd build && cmake .. \
-&& make && make install
+&& make && make install && rm -rf /usr/src/mkl-dnn-0.19
 
 WORKDIR /
 ENV OPENCV_VERSION="4.0.1"
@@ -73,4 +76,3 @@ RUN ln -s \
 
 WORKDIR /usr/src/app
 RUN rm -rf /var/lib/apt/lists/*
-
