@@ -18,7 +18,8 @@ RUN apt-get update \
         libtiff-dev \
         libavformat-dev \
         libpq-dev \
-        libv4l-dev
+        libv4l-dev \
+        libgstreamer-plugins-base1.0-dev
 
 RUN pip install numpy
 
@@ -35,8 +36,8 @@ RUN wget https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.tar.
 && tar xzvf ${OPENCV_VERSION}.tar.gz && rm -rf ${OPENCV_VERSION}.tar.gz
 
 RUN wget https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip \
-&& unzip ${OPENCV_VERSION}.zip \
-&& mkdir /opencv-${OPENCV_VERSION}/cmake_binary \
+&& unzip ${OPENCV_VERSION}.zip
+RUN mkdir /opencv-${OPENCV_VERSION}/cmake_binary \
 && cd /opencv-${OPENCV_VERSION}/cmake_binary \
 && cmake -DBUILD_TIFF=ON \
   -DBUILD_opencv_java=OFF \
@@ -48,8 +49,11 @@ RUN wget https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip \
   -DWITH_EIGEN=ON \
   -DWITH_V4L=ON \
   -DWITH_QT=OFF \
-  -DENABLE_NEON=ON \
-  -DENABLE_VFPV3=ON \
+  -DWITH_MKL=ON \
+  -DMKL_USE_MULTITHREAD=ON \
+  -DOPENCV_ENABLE_NONFREE=ON \
+  -DENABLE_NEON=OFF \
+  -DENABLE_VFPV3=OFF \
   -DOPENCV_EXTRA_MODULES_PATH=/opencv_contrib-${OPENCV_VERSION}/modules \
   -DBUILD_TESTS=OFF \
   -DBUILD_EXAMPLES=OFF \
