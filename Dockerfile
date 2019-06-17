@@ -1,5 +1,3 @@
-FROM homeassistant/home-assistant
-
 # OpenCV installation to support TensorFlow
 RUN apt-get update \
     && apt-get install -y \
@@ -32,6 +30,19 @@ RUN cd mkl-dnn-0.19/scripts \
 && ./prepare_mkl.sh && cd .. \
 && mkdir -p build && cd build && cmake .. \
 && make && make install && rm -rf /usr/src/mkl-dnn-0.19
+
+# Needed to build tensorflow from source with MKL and native CPU
+RUN wget https://github.com/bazelbuild/bazel/releases/download/0.21.0/bazel-0.21.0-installer-linux-x86_64.sh \
+&& chmod +x bazel-0.21.0-installer-linux-x86_64.sh \
+&& ./bazel-0.21.0-installer-linux-x86_64.sh --prefix=/opt/bazel \
+&& ln -sf /opt/bazel/bin/bazel /usr/bin
+
+RUN git clone https://github.com/tensorflow/tensorflow.git --branch v1.13.1 --depth=1
+RUN cd tensorflow && bazel build -c opt --config=mkl --copt=-march=native --copt=-mfpmath=both \
+--copt=-mavx --copt=-mavx2 --copt=-mfma //tensorflow/tools/pip_package:build_pip_package
+RUN ./buildme && ./bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg \
+&& pip install --upgrade --no-deps --force-reinstall /tmp/tensorflow_pkg/tensorflow-1.13.1-*.whl
+RUN rm -rf /opt/bazel
 
 WORKDIR /
 ENV OPENCV_VERSION="4.0.1"
@@ -67,12 +78,15 @@ RUN mkdir /opencv-${OPENCV_VERSION}/cmake_binary \
   -DPYTHON_INCLUDE_DIR=$(python3.7 -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") \
   -DPYTHON_PACKAGES_PATH=$(python3.7 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())") \
   .. \
-&& make install \
-&& rm /${OPENCV_VERSION}.zip \
-&& rm -r /opencv-${OPENCV_VERSION}
+&& make install
+
 RUN ln -s \
   /usr/local/python/cv2/python-3.7/cv2.cpython-37m-x86_64-linux-gnu.so \
   /usr/local/lib/python3.7/site-packages/cv2.so
 
+RUN rm -rf rm /${OPENCV_VERSION}.zip \
+&& rm -r /opencv-${OPENCV_VERSION}
+
 WORKDIR /usr/src/app
 RUN rm -rf /var/lib/apt/lists/*
+
