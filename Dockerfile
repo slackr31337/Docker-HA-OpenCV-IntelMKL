@@ -24,7 +24,7 @@ RUN pip install numpy
 
 # Intel MKL
 WORKDIR /usr/src
-RUN wget https://github.com/intel/mkl-dnn/archive/v0.19.tar.gz \
+RUN wget -q https://github.com/intel/mkl-dnn/archive/v0.19.tar.gz \
 && tar xzvf v0.19.tar.gz
 RUN cd mkl-dnn-0.19/scripts \
 && ./prepare_mkl.sh && cd .. \
@@ -32,14 +32,15 @@ RUN cd mkl-dnn-0.19/scripts \
 && make && make install && rm -rf /usr/src/mkl-dnn-0.19
 
 # Needed to build tensorflow from source with MKL and native CPU
-RUN wget https://github.com/bazelbuild/bazel/releases/download/0.21.0/bazel-0.21.0-installer-linux-x86_64.sh \
-&& chmod +x bazel-0.21.0-installer-linux-x86_64.sh \
-&& ./bazel-0.21.0-installer-linux-x86_64.sh --prefix=/opt/bazel \
+RUN wget -q https://github.com/bazelbuild/bazel/releases/download/0.21.0/bazel-0.21.0-installer-linux-x86_64.sh \
+&& chmod +x bazel-0.21.0-installer-linux-x86_64.sh 
+RUN ./bazel-0.21.0-installer-linux-x86_64.sh --prefix=/opt/bazel \
 && ln -sf /opt/bazel/bin/bazel /usr/bin
 
 RUN git clone https://github.com/tensorflow/tensorflow.git --branch v1.13.1 --depth=1
 RUN cd tensorflow && bazel build -c opt --config=mkl --copt=-march=native --copt=-mfpmath=both \
---copt=-mavx --copt=-mavx2 --copt=-mfma //tensorflow/tools/pip_package:build_pip_package
+//tensorflow/tools/pip_package:build_pip_package
+
 RUN ./buildme && ./bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg \
 && pip install --upgrade --no-deps --force-reinstall /tmp/tensorflow_pkg/tensorflow-1.13.1-*.whl
 RUN rm -rf /opt/bazel
