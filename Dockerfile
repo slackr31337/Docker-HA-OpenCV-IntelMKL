@@ -1,7 +1,8 @@
+FROM homeassistant/home-assistant
+
 # OpenCV installation to support TensorFlow
 RUN apt-get update \
     && apt-get install -y \
-        build-essential \
         cmake \
         git \
         wget \
@@ -20,12 +21,19 @@ RUN apt-get update \
         libhdf5-dev \
         libgstreamer-plugins-base1.0-dev
 
+RUN echo 'deb http://ftp.de.debian.org/debian testing main' >> /etc/apt/sources.list \
+&& echo 'APT::Default-Release "stable";' | tee -a /etc/apt/apt.conf.d/00local \
+&& apt-get update && apt -y -t testing install gcc-7 g++-7 build-essential
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7 \
+&& update-alternatives --install /usr/bin/cpp cpp-bin /usr/bin/cpp-7 100 --slave /usr/bin/x86_64-linux-gnu-cpp x86_64-linux-gnu-cpp /usr/bin/cpp-7
+
 RUN pip install numpy
 
 # Intel MKL
 WORKDIR /usr/src
 RUN wget -q https://github.com/intel/mkl-dnn/archive/v0.19.tar.gz \
-&& tar xzvf v0.19.tar.gz
+&& tar xzf v0.19.tar.gz
 RUN cd mkl-dnn-0.19/scripts \
 && ./prepare_mkl.sh && cd .. \
 && mkdir -p build && cd build && cmake .. \
@@ -33,13 +41,13 @@ RUN cd mkl-dnn-0.19/scripts \
 
 # Needed to build tensorflow from source with MKL and native CPU
 RUN wget -q https://github.com/bazelbuild/bazel/releases/download/0.21.0/bazel-0.21.0-installer-linux-x86_64.sh \
-&& chmod +x bazel-0.21.0-installer-linux-x86_64.sh 
+&& chmod +x bazel-0.21.0-installer-linux-x86_64.sh
 RUN ./bazel-0.21.0-installer-linux-x86_64.sh --prefix=/opt/bazel \
 && ln -sf /opt/bazel/bin/bazel /usr/bin
 
 RUN git clone https://github.com/tensorflow/tensorflow.git --branch v1.13.1 --depth=1
 RUN cd tensorflow && bazel build -c opt --config=mkl --copt=-march=native --copt=-mfpmath=both \
-//tensorflow/tools/pip_package:build_pip_package
+--jobs 1 --local_resources 2048,0.5,1.0 //tensorflow/tools/pip_package:build_pip_package
 
 RUN ./buildme && ./bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg \
 && pip install --upgrade --no-deps --force-reinstall /tmp/tensorflow_pkg/tensorflow-1.13.1-*.whl
@@ -90,4 +98,3 @@ RUN rm -rf rm /${OPENCV_VERSION}.zip \
 
 WORKDIR /usr/src/app
 RUN rm -rf /var/lib/apt/lists/*
-
