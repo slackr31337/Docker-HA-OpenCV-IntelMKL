@@ -1,4 +1,4 @@
-# Docker-Home-Assistant-OpenCV-IntelMKL
+# Docker-Home-Assistant-TensorFlow-OpenCV-Intel-MKL
 Home Assistant Docker with TensorFlow, OpenCV and Intel MKL Libraries
 
 
