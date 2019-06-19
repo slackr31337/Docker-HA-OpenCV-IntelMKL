@@ -43,13 +43,13 @@ RUN cd mkl-dnn-0.19/scripts \
 RUN wget -q https://github.com/bazelbuild/bazel/releases/download/0.21.0/bazel-0.21.0-installer-linux-x86_64.sh \
 && chmod +x bazel-0.21.0-installer-linux-x86_64.sh
 RUN ./bazel-0.21.0-installer-linux-x86_64.sh --prefix=/opt/bazel \
-&& ln -sf /opt/bazel/bin/bazel /usr/bin
+&& ln -sf /opt/bazel/bin/bazel /usr/bin && rm /usr/src/bazel-0.21.0-installer-linux-x86_64.sh
 
 RUN git clone https://github.com/tensorflow/tensorflow.git --branch v1.13.1 --depth=1
 RUN cd tensorflow && bazel build -c opt --config=mkl --copt=-march=native --copt=-mfpmath=both \
---jobs 1 --local_resources 2048,0.5,1.0 //tensorflow/tools/pip_package:build_pip_package
+--jobs 1 --local_resources 3000,4,1 //tensorflow/tools/pip_package:build_pip_package
 
-RUN ./buildme && ./bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg \
+RUN cd /usr/src/tensorflow && ./bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg \
 && pip install --upgrade --no-deps --force-reinstall /tmp/tensorflow_pkg/tensorflow-1.13.1-*.whl
 RUN rm -rf /opt/bazel
 
