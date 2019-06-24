@@ -78,7 +78,7 @@ RUN mkdir /usr/src/opencv-${OPENCV_VERSION}/cmake_binary \
   -DOPENCV_ENABLE_NONFREE=ON \
   -DENABLE_NEON=OFF \
   -DENABLE_VFPV3=OFF \
-  -DOPENCV_EXTRA_MODULES_PATH=/opencv_contrib-${OPENCV_VERSION}/modules \
+  -DOPENCV_EXTRA_MODULES_PATH=/usr/src/opencv_contrib-${OPENCV_VERSION}/modules \
   -DBUILD_TESTS=OFF \
   -DBUILD_EXAMPLES=OFF \
   -DBUILD_PERF_TESTS=OFF \
