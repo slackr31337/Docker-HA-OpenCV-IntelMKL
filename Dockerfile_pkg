@@ -1,0 +1,173 @@
+FROM homeassistant/home-assistant
+
+# OpenCV installation to support TensorFlow
+RUN apt-get update \
+  && apt-get install -y \
+        cmake \
+        git \
+        wget \
+        unzip \
+        yasm \
+        pkg-config \
+        libswscale-dev \
+        libtbb2 \
+        libtbb-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libtiff-dev \
+        libavformat-dev \
+        libpq-dev \
+        libv4l-dev \
+        libhdf5-dev \
+        libgstreamer-plugins-base1.0-dev
+
+RUN echo 'deb http://ftp.de.debian.org/debian testing main' >> /etc/apt/sources.list \
+  && echo 'APT::Default-Release "stable";' | tee -a /etc/apt/apt.conf.d/00local \
+  && apt-get update && apt -y -t testing install gcc-7 g++-7 build-essential
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7 \
+  && update-alternatives --install /usr/bin/cpp cpp-bin /usr/bin/cpp-7 100 --slave /usr/bin/x86_64-linux-gnu-cpp x86_64-linux-gnu-cpp /usr/bin/cpp-7
+
+RUN pip install numpy
+
+WORKDIR /usr/src
+COPY tensorflow-1.13.1-cp37-cp37m-linux_x86_64.whl /usr/src/tensorflow-1.13.1-cp37-cp37m-linux_x86_64.whl
+RUN pip install --upgrade --no-deps --force-reinstall /usr/src/tensorflow-1.13.1-*.whl
+
+RUN wget -q https://github.com/intel/mkl-dnn/archive/v0.19.tar.gz \
+  && tar xzf v0.19.tar.gz
+RUN cd mkl-dnn-0.19/scripts && ./prepare_mkl.sh && cd .. \
+  && mkdir -p build && cd build && cmake .. \
+  && make && make install && rm -rf /usr/src/mkl-dnn-0.19
+
+ENV OPENCV_VERSION="4.1.0"
+RUN wget https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.tar.gz \
+  && tar xzvf ${OPENCV_VERSION}.tar.gz && rm -rf ${OPENCV_VERSION}.tar.gz
+
+RUN wget https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip \
+  && unzip ${OPENCV_VERSION}.zip
+RUN mkdir /usr/src/opencv-${OPENCV_VERSION}/cmake_binary \
+  && cd /usr/src/opencv-${OPENCV_VERSION}/cmake_binary \
+  && cmake -DBUILD_TIFF=ON \
+  -DBUILD_opencv_java=OFF \
+  -DBUILD_PYTHON_SUPPORT=ON \
+  -DBUILD_opencv_python2=OFF \
+  -DBUILD_opencv_python3=ON \
+  -DWITH_CUDA=OFF \
+  -DWITH_OPENGL=OFF \
+  -DWITH_OPENCL=OFF \
+  -DWITH_IPP=ON \
+  -DWITH_TBB=OFF \
+  -DWITH_EIGEN=ON \
+  -DWITH_V4L=OFF \
+  -DWITH_QT=OFF \
+  -DWITH_MKL=ON \
+  -DMKL_USE_MULTITHREAD=OFF \
+  -DOPENCV_ENABLE_NONFREE=ON \
+  -DENABLE_NEON=OFF \
+  -DENABLE_VFPV3=OFF \
+  -DOPENCV_EXTRA_MODULES_PATH=/usr/src/opencv_contrib-${OPENCV_VERSION}/modules \
+  -DBUILD_TESTS=OFF \
+  -DBUILD_EXAMPLES=OFF \
+  -DBUILD_PERF_TESTS=OFF \
+  -DCMAKE_BUILD_TYPE=RELEASE \
+  -DCMAKE_INSTALL_PREFIX=$(python3.7 -c "import sys; print(sys.prefix)") \
+  -DPYTHON_EXECUTABLE=$(which python3.7) \
+  -DPYTHON_INCLUDE_DIR=$(python3.7 -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") \
+  -DPYTHON_PACKAGES_PATH=$(python3.7 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())") \
+  .. \
+  && make install
+
+RUN ln -s /usr/local/python/cv2/python-3.7/cv2.cpython-37m-x86_64-linux-gnu.so \
+/usr/local/lib/python3.7/site-packages/cv2.so; \
+  python -c "import cv2 as cv;print(cv.__version__)"
+
+RUN apt-get update -qq && apt-get -y install \
+  git-core \
+  libass-dev \
+  libfreetype6-dev \
+  libsdl2-dev \
+  libtool \
+  libva-dev \
+  libvdpau-dev \
+  libvorbis-dev \
+  libxcb1-dev \
+  libxcb-shm0-dev \
+  libxcb-xfixes0-dev \
+  pkg-config \
+  texinfo \
+  zlib1g-dev \
+  libx265-dev \
+  libnuma-dev \
+  libmp3lame-dev \
+  libopus-dev
+
+RUN mkdir -p /usr/src/ffmpeg && cd /usr/src/ffmpeg && \
+wget https://www.nasm.us/pub/nasm/releasebuilds/2.14.02/nasm-2.14.02.tar.bz2 && \
+tar xjvf nasm-2.14.02.tar.bz2 && cd nasm-2.14.02 && \
+./autogen.sh && \
+PATH="/opt/bin:$PATH" ./configure --prefix="/opt/ffmpeg" --bindir="/opt/ffmpeg/bin" && \
+make && make install
+
+RUN cd /usr/src/ffmpeg && \
+wget -O yasm-1.3.0.tar.gz https://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz && \
+tar xzvf yasm-1.3.0.tar.gz && cd yasm-1.3.0 && \
+./configure --prefix="/opt/ffmpeg" --bindir="/opt/ffmpeg/bin" && \
+make && make install
+
+RUN cd /usr/src/ffmpeg && \
+git -C libvpx pull 2> /dev/null || git clone --depth 1 https://chromium.googlesource.com/webm/libvpx.git && \
+cd libvpx && \
+PATH="/opt/bin:$PATH" ./configure --prefix="/opt/ffmpeg" --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --as=yasm && \
+PATH="/opt/bin:$PATH" make && make install
+
+RUN cd /usr/src/ffmpeg && \
+git -C fdk-aac pull 2> /dev/null || git clone --depth 1 https://github.com/mstorsjo/fdk-aac && \
+cd fdk-aac && autoreconf -fiv && \
+./configure --prefix="/opt/ffmpeg" --disable-shared && \
+make && make install
+
+RUN cd /usr/src/ffmpeg && \
+git -C x264 pull 2> /dev/null || git clone --depth 1 https://code.videolan.org/videolan/x264.git && cd x264 && \
+PATH="/opt/bin:$PATH" PKG_CONFIG_PATH="/opt/ffmpeg/lib/pkgconfig" ./configure --prefix="/opt/ffmpeg" --bindir="/opt/ffmpeg/bin" --enable-static --enable-pic && \
+PATH="/opt/bin:$PATH" make && make install
+
+RUN cd /usr/src/ffmpeg && \
+wget -O ffmpeg-snapshot.tar.bz2 https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2 && \
+tar xjvf ffmpeg-snapshot.tar.bz2 && cd ffmpeg && \
+PATH="/opt/bin:$PATH" PKG_CONFIG_PATH="/opt/ffmpeg/lib/pkgconfig" ./configure \
+  --prefix="/opt/ffmpeg" \
+  --pkg-config-flags="--static" \
+  --extra-cflags="-I/opt/ffmpeg/include" \
+  --extra-ldflags="-L/opt/ffmpeg/lib" \
+  --extra-libs="-lpthread -lm" \
+  --bindir="/opt/ffmpeg/bin" \
+  --enable-gpl \
+  --enable-libass \
+  --enable-libfdk-aac \
+  --enable-libfreetype \
+  --enable-libmp3lame \
+  --enable-libopus \
+  --enable-libvorbis \
+  --enable-libvpx \
+  --enable-libx264 \
+  --enable-libx265 \
+  --enable-nonfree \
+  --disable-debug \
+  --disable-doc \
+  --disable-ffplay && \
+PATH="/opt/bin:$PATH" make && make install && \
+hash -r
+
+RUN rm -rf /usr/src/opencv-${OPENCV_VERSION} /usr/src/ffmpeg \
+  /var/lib/apt/lists/* /usr/src/*.zip /usr/src/*.gz /usr/src/*.whl
+
+RUN rm -rf /etc/apt/apt.conf.d/00local && apt-get purge -yqq automake autoconf libtool build-essential \
+  && apt-get clean && apt-get clean autoclean \
+  && apt-get autoremove --yes \
+  && rm -Rf /var/lib/{apt,dpkg,cache,log}/
+
+WORKDIR /usr/src
+RUN wget https://raw.githubusercontent.com/tensorflow/tensorflow/master/tools/tf_env_collect.sh
+
+WORKDIR /usr/src/app
