@@ -31,8 +31,9 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /u
 RUN pip install numpy
 
 WORKDIR /usr/src
-COPY tensorflow-1.13.1-cp37-cp37m-linux_x86_64.whl /usr/src/tensorflow-1.13.1-cp37-cp37m-linux_x86_64.whl
-RUN pip install --upgrade --no-deps --force-reinstall /usr/src/tensorflow-1.13.1-*.whl
+#COPY tensorflow-1.13.1-cp37-cp37m-linux_x86_64.whl /usr/src/tensorflow-1.13.1-cp37-cp37m-linux_x86_64.whl
+RUN wget https://github.com/slackr31337/Docker-Home-Assistant-TensorFlow-OpenCV-Intel-MKL/releases/download/tensorflow-1.13.1-cp37/tensorflow-1.13.1-cp37-cp37m-linux_x86_64.whl \
+  && pip install --upgrade --no-deps --force-reinstall /usr/src/tensorflow-1.13.1-*.whl
 
 RUN wget -q https://github.com/intel/mkl-dnn/archive/v0.19.tar.gz \
   && tar xzf v0.19.tar.gz
@@ -79,7 +80,7 @@ RUN mkdir /usr/src/opencv-${OPENCV_VERSION}/cmake_binary \
   && make install
 
 RUN ln -s /usr/local/python/cv2/python-3.7/cv2.cpython-37m-x86_64-linux-gnu.so \
-/usr/local/lib/python3.7/site-packages/cv2.so; \
+  /usr/local/lib/python3.7/site-packages/cv2.so; \
   python -c "import cv2 as cv;print(cv.__version__)"
 
 RUN apt-get update -qq && apt-get -y install \
@@ -106,7 +107,7 @@ RUN mkdir -p /usr/src/ffmpeg && cd /usr/src/ffmpeg && \
 wget https://www.nasm.us/pub/nasm/releasebuilds/2.14.02/nasm-2.14.02.tar.bz2 && \
 tar xjvf nasm-2.14.02.tar.bz2 && cd nasm-2.14.02 && \
 ./autogen.sh && \
-PATH="/opt/bin:$PATH" ./configure --prefix="/opt/ffmpeg" --bindir="/opt/ffmpeg/bin" && \
+PATH="/opt/ffmpeg/bin:$PATH" ./configure --prefix="/opt/ffmpeg" --bindir="/opt/ffmpeg/bin" && \
 make && make install
 
 RUN cd /usr/src/ffmpeg && \
@@ -118,24 +119,23 @@ make && make install
 RUN cd /usr/src/ffmpeg && \
 git -C libvpx pull 2> /dev/null || git clone --depth 1 https://chromium.googlesource.com/webm/libvpx.git && \
 cd libvpx && \
-PATH="/opt/bin:$PATH" ./configure --prefix="/opt/ffmpeg" --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --as=yasm && \
-PATH="/opt/bin:$PATH" make && make install
+PATH="/opt/ffmpeg/bin:$PATH" ./configure --prefix="/opt/ffmpeg" --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --as=yasm && \
+PATH="/opt/ffmpeg/bin:$PATH" make && make install
 
 RUN cd /usr/src/ffmpeg && \
 git -C fdk-aac pull 2> /dev/null || git clone --depth 1 https://github.com/mstorsjo/fdk-aac && \
-cd fdk-aac && autoreconf -fiv && \
-./configure --prefix="/opt/ffmpeg" --disable-shared && \
+cd fdk-aac && autoreconf -fiv && ./configure --prefix="/opt/ffmpeg" --disable-shared && \
 make && make install
 
 RUN cd /usr/src/ffmpeg && \
 git -C x264 pull 2> /dev/null || git clone --depth 1 https://code.videolan.org/videolan/x264.git && cd x264 && \
-PATH="/opt/bin:$PATH" PKG_CONFIG_PATH="/opt/ffmpeg/lib/pkgconfig" ./configure --prefix="/opt/ffmpeg" --bindir="/opt/ffmpeg/bin" --enable-static --enable-pic && \
-PATH="/opt/bin:$PATH" make && make install
+PATH="/opt/ffmpeg/bin:$PATH" PKG_CONFIG_PATH="/opt/ffmpeg/lib/pkgconfig" ./configure --prefix="/opt/ffmpeg" --bindir="/opt/ffmpeg/bin" --enable-static --enable-pic && \
+PATH="/opt/ffmpeg/bin:$PATH" make && make install
 
 RUN cd /usr/src/ffmpeg && \
 wget -O ffmpeg-snapshot.tar.bz2 https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2 && \
 tar xjvf ffmpeg-snapshot.tar.bz2 && cd ffmpeg && \
-PATH="/opt/bin:$PATH" PKG_CONFIG_PATH="/opt/ffmpeg/lib/pkgconfig" ./configure \
+PATH="/opt/ffmpeg/bin:$PATH" PKG_CONFIG_PATH="/opt/ffmpeg/lib/pkgconfig" ./configure \
   --prefix="/opt/ffmpeg" \
   --pkg-config-flags="--static" \
   --extra-cflags="-I/opt/ffmpeg/include" \
@@ -156,7 +156,7 @@ PATH="/opt/bin:$PATH" PKG_CONFIG_PATH="/opt/ffmpeg/lib/pkgconfig" ./configure \
   --disable-debug \
   --disable-doc \
   --disable-ffplay && \
-PATH="/opt/bin:$PATH" make && make install && \
+PATH="/opt/ffmpeg/bin:$PATH" make && PATH="/opt/ffmpeg/bin:$PATH" make install && \
 hash -r
 
 RUN rm -rf /usr/src/opencv-${OPENCV_VERSION} /usr/src/ffmpeg \
